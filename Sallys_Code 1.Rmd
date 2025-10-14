@@ -1,0 +1,389 @@
+---
+title: "Consuting"
+author: "Gideon Addo"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(dplyr)
+library(mosaic)
+```
+
+
+```{r}
+# loading in both datasets
+metabolics_uncleaned <- read_xlsx("Metabolic Syndrome Data.xlsx", sheet = 1)
+metabolics_uncleaned2 <- read_xlsx("Metabolic Syndrome Data (2).xlsx", sheet = 1)
+
+# Checking if columns names are the order the same column names
+colnames(metabolics_uncleaned) == colnames(metabolics_uncleaned2)
+```
+
+
+```{r}
+# Cleaning Function
+cleaner <- function(dataframe)
+{
+  metabolics <- dataframe %>%
+  transmute(
+    participant_ID = `Participant ID`,
+    A1c = A1c,
+    systolic_bp = `Systolic BP`,
+    diastolic_bp = `Diastolic BP`,
+    BMI = BMI,
+    sex = factor(sex),
+    age = ifelse((age >= 18) &  (age <= 25), "18-25 years",
+                 ifelse((age >= 26) &  (age <= 40), "26-40 years", 
+                        ifelse((age >= 41) &  (age <= 55), "41-55 years", ">56 years"))),
+    country_origin = factor(`country of origin`),
+    time_in_US = factor(`time in US`),
+    employment_status = factor(`employed?`),
+    job_type = factor(`job type`),
+    income = factor(income),
+    level_of_ed = factor(`level of education`),
+    food_insecurity = factor(`food insecurity`),
+    eng_speak_ability = factor(`english speaking ability`),
+    eng_read_ability = factor(`english reading ability`),
+    has_primary_provider = factor(`has primary care provider`),
+    has_insurance = factor(`has insurance`),
+    triglyc_level = `Triglicéridos (< 150 mg/dL)`,
+    HDL = HDL,
+    bp_binary = if_else(systolic_bp > 130 & diastolic_bp > 80, 1, 0),
+    A1c_binary = if_else(A1c > 5.7, 1, 0),
+    low_HDL_binary = if_else((HDL < 40 & sex == "Masculino") | (HDL < 50 & sex == "Feminino"), 1, 0)
+  ) %>%
+    mutate(triglyc_binary = if_else(triglyc_level > 150, 1, 0)) %>%
+    mutate(num_risks = bp_binary + A1c_binary + low_HDL_binary + triglyc_binary)
+
+  return(metabolics)
+}
+
+# Combining the two datasets
+metabolics_uncleaned <- rbind(cleaner(metabolics_uncleaned), cleaner(metabolics_uncleaned2)) %>% distinct()
+
+summary(metabolics_uncleaned)
+```
+
+
+```{r}
+# CONVERTING ALL IMPORTANT VARIABLES FROM SPANISH TO ENGLISH 
+# Added Ecuador to South America, Created a new level for USA
+metabolics <- metabolics_uncleaned %>%
+  mutate(
+    # Country of origin
+    country_origin = case_when(country_origin %in% c("Honduras", "Guatemala", "honduras", "Guatamala", "El Salvador", "HONDURAS") ~ "Central America (Honduras, Guatemala, El Salvador, Nicaragua)",
+    country_origin %in% c("Colombia", "Peru", "Venezuela", "Columbia", "PERU", "Ecuador", "ECUADOR") ~ "South America (Peru, Colombia, Venezuela, Ecuador)",
+    country_origin %in% c("Mexico", "México", "MEXICO") ~ "Mexico",
+    country_origin %in% c("United States", "USA") ~ "USA",
+    TRUE ~ country_origin),
+    # time in US
+    time_in_US = case_when(
+    time_in_US == "< 6 meses" ~ "<1 year",
+    time_in_US == "6 meses - 1 año" ~ "<1 year",
+    time_in_US == ">1 año < 5 años" ~ "1-5 years",
+    time_in_US == "> 5 años" ~ ">5 years"),
+    # JOB TYPE
+    job_type = case_when(
+    job_type %in% c("Construccion", "Construcción") ~ "Construction",
+    job_type %in% c("Limpieza") ~ "Cleaning",
+    job_type %in% c("Cocina", "Cocina/restaurante") ~ "Restaurant",
+    job_type %in% c("Otro", "Agricultura", "Preferiro no decir") ~ "Other",
+    TRUE ~ NA_character_),
+    # INCOME
+    income = case_when(
+    income %in% c("$0-500", "0-500") ~ "$0-500",
+    income %in% c("$501-1,000", "$501-1000", "501-1000") ~ "$501-1,000",
+    income %in% c("$1,001-2,000", "1001-2000", "$1001-2000", "$1,001–2,000") ~ "$1,001-2,000",
+    income %in% c("Más que $2,000", ">2000", "> 2000") ~ ">$2,000",
+    income %in% c("Preferiro no decir", "99") ~ "Prefer not to say",
+    TRUE ~ NA_character_),
+    # level of education
+    level_of_ed = case_when(
+    level_of_ed %in% c("Cierto nivel de escuela primaria") ~ "Some primary school",
+    level_of_ed %in% c("Titulo de primaria") ~ "Graduated primary school",
+    level_of_ed %in% c("Cierto nivel de escuela secundaria") ~ "Some high school",
+    level_of_ed %in% c("Titulo de secundaria", "Título de secundaria") ~ "Graduated high school",
+    level_of_ed %in% c("Cierto nivel de universidad", 
+                     "Titulo de universidad", 
+                     "Cierto nivel despues de la escuela secundaria") ~ "Beyond high school",
+    level_of_ed %in% c("Preferiro no decir", "99") ~ "Prefer not to say",
+    TRUE ~ NA_character_),
+    # English speaking
+    eng_speak_ability = case_when(
+    eng_speak_ability %in% c("Pobre", "No hablo ingles") ~ "Poor",
+    eng_speak_ability %in% c("Mas o Menos", "Más o menos") ~ "Moderate",
+    eng_speak_ability %in% c("Bien", "Muy bien") ~ "High",
+    eng_speak_ability %in% c("No se") ~ "I don't know",
+    TRUE ~ NA_character_),
+    # Has primary care provider
+    has_primary_provider = case_when(
+    has_primary_provider %in% c("Si") ~ "Yes",
+    has_primary_provider %in% c("No") ~ "No",
+    has_primary_provider %in% c("Prefiero no decir") ~ "Prefer not to say",
+    TRUE ~ NA_character_),
+    # Has insurance
+    has_insurance = case_when(
+    has_insurance %in% c("Si") ~ "Yes",
+    has_insurance %in% c("No") ~ "No",
+    has_insurance %in% c("Prefiero no decir") ~ "Prefer not to say",
+    TRUE ~ NA_character_),
+    # Food insecurity
+    food_insecurity = case_when(
+    food_insecurity %in% c("Nunca") ~ "Never",
+    food_insecurity %in% c("A veces", "A Veces") ~ "Sometimes",
+    food_insecurity %in% c("Frecuentemente", "Frecuentamente") ~ "Frequently",
+    food_insecurity %in% c("Preferiro no decir", "99") ~ "Prefer not to say",
+    TRUE ~ NA_character_),
+    # English reading ability
+    eng_read_ability = case_when(
+    eng_read_ability %in% c("Pobre", "No leo ingles") ~ "Poor",
+    eng_read_ability %in% c("Mas o Menos", "Más o menos") ~ "Moderate",
+    eng_read_ability %in% c("Bien", "Muy bien") ~ "High",
+    eng_read_ability %in% c("No se") ~ "I don't know",
+    TRUE ~ NA_character_),
+    # Employment status
+    employment_status = case_when(
+    employment_status %in% c("Si", "Yes") ~ "Yes",
+    employment_status %in% c("No") ~ "No",
+    TRUE ~ NA_character_),
+    # Sex
+    sex = case_when(
+    sex %in% c("Feminino") ~ "Female",
+    sex %in% c("Masculino") ~ "Male",
+    TRUE ~ NA_character_))
+
+
+# Converting all categorical variables into factors
+metabolics <- metabolics %>% mutate(sex = as.factor(sex),
+                                    age = as.factor(age),
+                                    country_origin = as.factor(country_origin),
+                                    time_in_US = as.factor(time_in_US),
+                                    employment_status = as.factor(employment_status),
+                                    job_type = as.factor(job_type),
+                                    income = as.factor(income),
+                                    level_of_ed = as.factor(level_of_ed),
+                                    food_insecurity = as.factor(food_insecurity),
+                                    eng_speak_ability = as.factor(eng_speak_ability),
+                                    eng_read_ability = as.factor(eng_read_ability),
+                                    has_primary_provider = as.factor(has_primary_provider),
+                                    has_insurance = as.factor(has_insurance))  
+
+## TO BE DONE BY KAYLEE
+#%>% 
+#mutate(# Acculturation
+#acculturation = case_when(
+#(eng_speak_ability %in% c("High")) & (eng_read_ability %in% c"High")) ~ "High English Proficiency",
+#(eng_speak_ability %in% ("Moderate", "High")) & (eng_read_ability %in% c("Moderate", "High"))  ~ "Mid English Proficiency",
+#(eng_speak_ability %in% c("Moderate")) & (eng_read_ability %in% c("High"))  ~ "Mid English Proficiency",
+#(eng_speak_ability %in% c("Moderate")) & (eng_read_ability == "Low")  ~ "Mid English Proficiency",
+#(eng_speak_ability == "Poor") & (eng_read_ability == "Poor") ~ "Low English Proficiency",
+#TRUE ~ NA_character_))
+```
+
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of sex with age 
+sex_age <- tally(~ age + sex, data = metabolics)
+sex_age
+chisq.test(sex_age)
+
+# Permutation test of chi-square of sex and age
+T_obs <- suppressWarnings(chisq(chisq.test(x = metabolics[["age"]], y = metabolics[["sex"]])))
+  
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+  T_perms[i] <- suppressWarnings(chisq(chisq.test(x = shuffle(metabolics[["age"]]), y = metabolics[["sex"]])))
+}
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of sex with country of origin 
+sex_country <- tally(~ country_origin + sex, data = metabolics[!is.na(metabolics$country_origin), ])
+sex_country
+chisq.test(sex_country)
+
+# Permutation test of chi-square of sex and country of origin
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ country_origin + sex, data = metabolics[!is.na(metabolics$country_origin), ]))))
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+  T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(country_origin) + sex, data = metabolics[!is.na(metabolics$country_origin), ]))))
+}
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of gender with time in USA 
+gender_time <- tally(~ time_in_US + sex, data = metabolics[!is.na(metabolics$time_in_US), ])
+gender_time
+chisq.test(gender_time)
+
+# Permutation test of chi-square of gender and country of origin
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ time_in_US + sex, data = metabolics[!is.na(metabolics$time_in_US), ]))))
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+  T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(time_in_US) + sex, data = metabolics[!is.na(metabolics$time_in_US), ]))))
+}
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of gender with job type 
+gender_job <- tally(~ job_type + sex, data = metabolics[!is.na(metabolics$job_type), ])
+gender_job
+chisq.test(gender_job)
+
+# Permutation test of chi-square of gender and country of origin
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ job_type + sex, data = metabolics[!is.na(metabolics$job_type), ]))))
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+  T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(job_type) + sex, data = metabolics[!is.na(metabolics$job_type), ]))))
+}
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of gender with income 
+gender_income <- tally(~ income + sex, data = metabolics[!is.na(metabolics$income), ])
+gender_income
+chisq.test(gender_income)
+
+# Permutation test of chi-square of gender and country of origin
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ income + sex, data = metabolics[!is.na(metabolics$income), ]))))
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+  T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(income) + sex, data = metabolics[!is.na(metabolics$income), ]))))
+}
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of gender with income 
+gender_education <- tally(~ level_of_ed + sex, data = metabolics[!is.na(metabolics$level_of_ed), ])
+gender_education
+chisq.test(gender_education)
+
+# Permutation test of chi-square of gender and country of origin
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ level_of_ed + sex, data = metabolics[!is.na(metabolics$level_of_ed), ]))))
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+  T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(level_of_ed) + sex, data = metabolics[!is.na(metabolics$level_of_ed), ]))))
+}
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of gender with English Speaking ability 
+gender_speak <- tally(~ eng_speak_ability + sex, data = metabolics[!is.na(metabolics$eng_speak_ability), ])
+gender_speak
+chisq.test(gender_speak)
+
+# Permutation test of chi-square of gender and english speaking ability
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ eng_speak_ability + sex, data = metabolics[!is.na(metabolics$eng_speak_ability), ]))))
+
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(eng_speak_ability) + sex, data = metabolics[!is.na(metabolics$eng_speak_ability), ]))))
+}
+
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of gender with english reading ability 
+gender_read <- tally(~ eng_speak_ability + sex, data = metabolics[!is.na(metabolics$eng_read_ability), ])
+gender_read
+chisq.test(gender_read)
+
+# Permutation test of chi-square of gender and english reading ability
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ eng_speak_ability + sex, data = metabolics[!is.na(metabolics$eng_speak_ability), ]))))
+
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(eng_read_ability) + sex, data = metabolics[!is.na(metabolics$eng_read_ability), ]))))
+}
+
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of gender with primary healthcare
+gender_primaryCare <- tally(~ has_primary_provider + sex, data = metabolics[!is.na(metabolics$has_primary_provider), ])
+gender_primaryCare
+chisq.test(gender_primaryCare)
+
+# Permutation test of chi-square of gender and primary healthcare
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ has_primary_provider + sex, data = metabolics[!is.na(metabolics$has_primary_provider), ]))))
+
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(has_primary_provider) + sex, data = metabolics[!is.na(metabolics$has_primary_provider), ]))))
+}
+
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```
+
+
+
+```{r, warning = FASLE}
+set.seed(510510)
+# Chi-square test of independence of gender with insurannce
+gender_insurance <- tally(~ has_insurance + sex, data = metabolics[!is.na(metabolics$has_insurance), ])
+gender_insurance
+chisq.test(gender_insurance)
+
+# Permutation test of chi-square of gender and insurance
+T_obs <- suppressWarnings(chisq(chisq.test(tally(~ has_insurance + sex, data = metabolics[!is.na(metabolics$has_insurance), ]))))
+
+# Permutation distribution
+T_perms <- numeric(10000)
+for (i in 1:length(T_perms)) {
+T_perms[i] <- suppressWarnings(chisq(chisq.test(tally(~ shuffle(has_insurance) + sex, data = metabolics[!is.na(metabolics$has_insurance), ]))))
+}
+
+# Compute p-value
+p_value <- pdata(T_perms, T_obs, lower.tail = FALSE)[[1]]
+p_value
+```

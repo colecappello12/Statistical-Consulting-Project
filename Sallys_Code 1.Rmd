@@ -61,17 +61,55 @@ cleaner <- function(dataframe)
   return(metabolics)
 }
 
-# Combining the two datasets
-metabolics_uncleaned <- rbind(cleaner(metabolics_uncleaned), cleaner(metabolics_uncleaned2)) %>% distinct()
+# Cleaning raw dataset
+metabolics_cleaned <- cleaner(metabolics_uncleaned)
 
 summary(metabolics_uncleaned)
+# Now 85 total
+# 8 missing A1C
+# 2 missing Triglyc
+# 2 missing HDL
 ```
 
+```{r acculturation}
+metabolics_cleaned %>%
+  count(eng_speak_ability)
+
+metabolics <- metabolics_cleaned %>%
+  mutate(eng_proficiency = case_when(
+    # HIGH
+    eng_read_ability %in% c("Muy bien", "Bien") &
+      eng_speak_ability %in% c("Muy bien", "Bien") ~ "high",
+    # MODERATE
+    (eng_read_ability %in% c("Mas o Menos", "Más o menos") &
+      eng_speak_ability %in% c("Muy bien", "Bien", "Mas o Menos", "Más o menos") | # Mas o menos combo for read ability
+      eng_speak_ability %in% c("Mas o Menos", "Más o menos") &
+      eng_read_ability %in% c("Muy bien", "Bien", "Mas o Menos", "Más o menos") | # Mas o menos combo for speak ability
+      eng_read_ability %in% c("Pobre", "No leo ingles") &
+      eng_speak_ability %in% c("Muy bien", "Bien") | # Pobre combo for read ability
+      eng_speak_ability %in% c("Pobre", "No hablo ingles") & # Pobre combo for speak ability
+      eng_read_ability %in% c("Muy bien", "Bien")) ~ "moderate",
+    # LOW
+    (eng_speak_ability %in% c("Pobre", "No hablo ingles") & eng_read_ability %in% c("Pobre", "No leo ingles") |
+       eng_speak_ability %in% c("Pobre", "No hablo ingles") & eng_read_ability %in% c("Mas o Menos", "Más o menos") |
+      eng_read_ability %in% c("Pobre", "No leo ingles") & eng_speak_ability %in% c("Mas o Menos", "Más o menos")
+       ) ~ "low"
+  ) %>% as.factor())
+
+metabolics %>%
+  count(eng_proficiency)
+# 11 NAs from eng_proficiency
+
+metabolics %>%
+  filter(is.na(eng_proficiency)) %>%
+  select(eng_speak_ability, eng_read_ability, eng_proficiency)
+# Confirmation the code for new variable eng_proficiency works!
+```
 
 ```{r}
 # CONVERTING ALL IMPORTANT VARIABLES FROM SPANISH TO ENGLISH 
 # Added Ecuador to South America, Created a new level for USA
-metabolics <- metabolics_uncleaned %>%
+metabolics <- metabolics %>%
   mutate(
     # Country of origin
     country_origin = case_when(country_origin %in% c("Honduras", "Guatemala", "honduras", "Guatamala", "El Salvador", "HONDURAS") ~ "Central America (Honduras, Guatemala, El Salvador, Nicaragua)",

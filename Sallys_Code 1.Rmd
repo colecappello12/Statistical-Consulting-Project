@@ -10,13 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 library(readxl)
 library(dplyr)
 library(mosaic)
+library(foreign)
+library(MASS)
 ```
 
+# Data Cleaning
 
 ```{r}
 # loading in both datasets
 metabolics_uncleaned <- read_xlsx("Metabolic Syndrome Data.xlsx", sheet = 1)
-metabolics_uncleaned2 <- read_xlsx("Metabolic Syndrome Data (2).xlsx", sheet = 1)
 
 # Checking if columns names are the order the same column names
 colnames(metabolics_uncleaned) == colnames(metabolics_uncleaned2)
@@ -56,7 +58,8 @@ cleaner <- function(dataframe)
     low_HDL_binary = if_else((HDL < 40 & sex == "Masculino") | (HDL < 50 & sex == "Feminino"), 1, 0)
   ) %>%
     mutate(triglyc_binary = if_else(triglyc_level > 150, 1, 0)) %>%
-    mutate(num_risks = bp_binary + A1c_binary + low_HDL_binary + triglyc_binary)
+    mutate(num_risks = bp_binary + A1c_binary + low_HDL_binary + triglyc_binary) %>%
+    mutate(num_risks = as.factor(num_risks))  
 
   return(metabolics)
 }
@@ -221,6 +224,17 @@ metabolics <- metabolics %>% mutate(sex = as.factor(sex),
 #TRUE ~ NA_character_))
 ```
 
+# Model Fit
+
+```{r}
+
+ord.fit <- polr(formula = num_risks ~ BMI + income + country_origin + eng_proficiency + food_insecurity + level_of_ed, data = metabolics)
+
+summary(ord.fit)
+
+```
+
+# Tallys and P-values
 
 ```{r, warning = FASLE}
 set.seed(510510)

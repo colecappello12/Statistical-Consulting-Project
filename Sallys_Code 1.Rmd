@@ -27,8 +27,7 @@ colnames(metabolics_uncleaned) == colnames(metabolics_uncleaned2)
 
 ```{r}
 # Cleaning Function
-cleaner <- function(dataframe)
-{
+cleaner <- function(dataframe) {
   metabolics <- dataframe %>%
   transmute(
     participant_ID = `Participant ID`,
@@ -225,6 +224,18 @@ metabolics <- metabolics %>% mutate(sex = as.factor(sex),
 ```
 
 # Model Fit
+
+```{r}
+
+# Relevel variables to make more understandable
+metabolics$income <- factor(metabolics$income, levels = c("$0-500", "$501-1,000", "$1,001-2,000", ">$2,000", "Prefer not to say"))
+metabolics$country_origin <- factor(metabolics$country_origin, levels = c("USA","Mexico","Central America (Honduras, Guatemala, El Salvador, Nicaragua)","South America (Peru, Colombia, Venezuela, Ecuador)"))
+metabolics$eng_proficiency <- factor(metabolics$eng_proficiency, levels = c("low","moderate","high"))
+metabolics$food_insecurity <- factor(metabolics$food_insecurity, levels = c("Never","Sometimes","Frequently","Prefer not to say"))
+metabolics$level_of_ed <- factor(metabolics$level_of_ed, levels = c("Some primary school","Graduated primary school","Some high school","Graduated high school","Beyond high school","Prefer not to say"))
+    
+```
+
 
 ```{r}
 

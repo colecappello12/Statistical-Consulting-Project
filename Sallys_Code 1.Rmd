@@ -20,8 +20,6 @@ library(MASS)
 # loading in both datasets
 metabolics_uncleaned <- read_xlsx("Metabolic Syndrome Data.xlsx", sheet = 1)
 
-# Checking if columns names are the order the same column names
-colnames(metabolics_uncleaned) == colnames(metabolics_uncleaned2)
 ```
 
 
@@ -104,7 +102,7 @@ metabolics %>%
 
 metabolics %>%
   filter(is.na(eng_proficiency)) %>%
-  select(eng_speak_ability, eng_read_ability, eng_proficiency)
+  dplyr::select(eng_speak_ability, eng_read_ability, eng_proficiency)
 # Confirmation the code for new variable eng_proficiency works!
 ```
 
@@ -211,16 +209,6 @@ metabolics <- metabolics %>% mutate(sex = as.factor(sex),
                                     has_primary_provider = as.factor(has_primary_provider),
                                     has_insurance = as.factor(has_insurance))  
 
-## TO BE DONE BY KAYLEE
-#%>% 
-#mutate(# Acculturation
-#acculturation = case_when(
-#(eng_speak_ability %in% c("High")) & (eng_read_ability %in% c"High")) ~ "High English Proficiency",
-#(eng_speak_ability %in% ("Moderate", "High")) & (eng_read_ability %in% c("Moderate", "High"))  ~ "Mid English Proficiency",
-#(eng_speak_ability %in% c("Moderate")) & (eng_read_ability %in% c("High"))  ~ "Mid English Proficiency",
-#(eng_speak_ability %in% c("Moderate")) & (eng_read_ability == "Low")  ~ "Mid English Proficiency",
-#(eng_speak_ability == "Poor") & (eng_read_ability == "Poor") ~ "Low English Proficiency",
-#TRUE ~ NA_character_))
 ```
 
 # Model Fit
